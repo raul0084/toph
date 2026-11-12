@@ -20,8 +20,28 @@ boxes in the **LiDAR frame**, OpenPCDet convention. `class_id` indexes `meta.jso
 (`Car, Pedestrian, Cyclist`). No FOV crop or score filtering is applied on the GPU side
 (model's internal score threshold only). Change this contract in `run_detection.py` and here together.
 
+## Tracking (`src/tracking`)
+
+AB3DMOT-style, in the KITTI **camera frame**, per class. Tracker box order is
+`[x, y, z, ry, l, w, h]` (bottom-center, y down) — note this differs from KITTI label order
+`h, w, l, x, y, z, ry`; `track_sequence` converts at the boundary.
+- `kalman.py` constant-velocity KF (dt = 1 frame), heading treated as ambiguous up to pi.
+- `association.py` 3D IoU (shapely BEV × height) or center distance; Hungarian with gating applied
+  *before* solving (out-of-gate pairs get a constant cost — see regression test).
+- `tracker.py` `track_sequence(dets_df, calib, ...)` -> KITTI tracking result DataFrame;
+  `write_kitti_tracking` writes submission files. Per-class `ClassConfig` in `DEFAULT_CONFIGS`.
+- No ego-motion compensation yet (oxts is available) — main remaining source of ID switches on turns.
+- `scripts/track_gt_sanity.py` runs the tracker on noisy GT-derived detections (no detector needed).
+
+## Environment & tests
+
+Local env is conda `holocene` (Python 3.11). Run `python -m pytest` from the repo root.
+Imports are `from src.<pkg>.<module> import ...` (pytest `pythonpath = ["."]`).
+
 ## Layout
 
 - `third_party/OpenPCDet` — git submodule, pinned; don't edit.
-- `data/` — KITTI calib/labels/images locally (gitignored).
+- `data/` — KITTI files as unzipped (gitignored): `data_tracking_calib/<split>/calib`,
+  `data_tracking_oxts/<split>/oxts`, `data_tracking_image_2/<split>/image_02`,
+  `training/label_02`. Always resolve via `src/data/paths.py` (`kitti_dir`, `image_shape`).
 - `results/` — detection zips unpacked here, tracker outputs.
