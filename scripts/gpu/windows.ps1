@@ -1,6 +1,6 @@
 # toph GPU runner for Windows. Paste this into PowerShell:
 #
-#   irm https://raw.githubusercontent.com/raul0084/toph/main/scripts/gpu/windows.ps1 | iex
+#   irm https://raw.githubusercontent.com/raul0084/toph/v0.1/scripts/gpu/windows.ps1 | iex
 #
 # What it does:
 #   1. Checks for an NVIDIA GPU.
@@ -11,7 +11,7 @@
 
 $ErrorActionPreference = 'Stop'
 $Distro = 'Ubuntu'
-$SetupUrl = 'https://raw.githubusercontent.com/raul0084/toph/main/scripts/gpu/setup.sh'
+$SetupUrl = 'https://raw.githubusercontent.com/raul0084/toph/v0.1/scripts/gpu/setup.sh'
 
 function Say($msg, $color = 'Cyan') { Write-Host "`n==> $msg" -ForegroundColor $color }
 

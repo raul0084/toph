@@ -2,7 +2,7 @@
 # toph GPU runner: sets everything up, runs 3D detection on KITTI Tracking, packages results.
 #
 # One-liner (Linux / inside WSL):
-#   curl -fsSL https://raw.githubusercontent.com/raul0084/toph/main/scripts/gpu/setup.sh | bash
+#   curl -fsSL https://raw.githubusercontent.com/raul0084/toph/v0.1/scripts/gpu/setup.sh | bash
 #
 # Safe to re-run: every finished step is skipped, downloads resume.
 # Everything lives in $TOPH_HOME (default ~/toph-gpu). Delete that folder to uninstall.
@@ -11,6 +11,8 @@
 #   TOPH_HOME   install dir                     (default ~/toph-gpu)
 #   TOPH_MODEL  pv_rcnn | pointpillar           (default pv_rcnn)
 #   TOPH_REPO   git URL of the toph repo
+#   TOPH_REF    git tag/commit to run (default: the pinned release below). Pinned on purpose:
+#               this script runs whatever code TOPH_REF points at, so it must not follow `main`.
 #   TOPH_SPLITS "training testing"              (which KITTI tracking splits to run)
 
 main() {
@@ -20,6 +22,9 @@ TOPH_HOME="${TOPH_HOME:-$HOME/toph-gpu}"
 TOPH_MODEL="${TOPH_MODEL:-pv_rcnn}"
 TOPH_REPO="${TOPH_REPO:-https://github.com/raul0084/toph.git}"
 TOPH_SPLITS="${TOPH_SPLITS:-training testing}"
+TOPH_REF="${TOPH_REF:-v0.1}"
+MINIFORGE_VERSION="26.7.2-1"
+MINIFORGE_SHA256="cf0df84220e1c83a1cb2f447056594ca458fa4c6a353430c498f281ec21bd187"
 KITTI_URL="https://s3.eu-central-1.amazonaws.com/avg-kitti/data_tracking_velodyne.zip"
 NEED_GB=90
 
@@ -37,9 +42,24 @@ fail() {
 }
 trap fail ERR
 
+# Abort unless file $1 has SHA-256 $2. Protects against corrupted or tampered downloads.
+check_sha256() {
+  local actual
+  actual=$(sha256sum "$1" | cut -d' ' -f1)
+  if [[ "$actual" != "$2" ]]; then
+    echo "Checksum mismatch for $1"
+    echo "  expected $2"
+    echo "  got      $actual"
+    rm -f "$1"
+    false
+  fi
+}
+
 case "$TOPH_MODEL" in
-  pv_rcnn)     CFG="cfgs/kitti_models/pv_rcnn.yaml";     GDRIVE_ID="1lIOq4Hxr0W3qsX83ilQv0nk1Cls6KAr-" ;;
-  pointpillar) CFG="cfgs/kitti_models/pointpillar.yaml"; GDRIVE_ID="1wMxWTpU1qUoY3DsCH31WJmvJxcjFXKlm" ;;
+  pv_rcnn)     CFG="cfgs/kitti_models/pv_rcnn.yaml";     GDRIVE_ID="1lIOq4Hxr0W3qsX83ilQv0nk1Cls6KAr-"
+               CKPT_SHA256="08552932026855bcc10f66dbc45409f139d3208fd0095c2aab1f459f055fe463" ;;
+  pointpillar) CFG="cfgs/kitti_models/pointpillar.yaml"; GDRIVE_ID="1wMxWTpU1qUoY3DsCH31WJmvJxcjFXKlm"
+               CKPT_SHA256="4c83fc0fa02575b9b3e9dec676f698e7a70bb5a795e89f91df8a96b916fa19e2" ;;
   *) echo "Unknown TOPH_MODEL=$TOPH_MODEL"; exit 1 ;;
 esac
 
@@ -89,7 +109,8 @@ MF="$TOPH_HOME/miniforge"
 if [[ ! -x "$MF/bin/conda" ]]; then
   step "Installing Miniforge (private Python, doesn't touch the system)"
   wget -q -O "$TOPH_HOME/miniforge.sh" \
-    "https://github.com/conda-forge/miniforge/releases/latest/download/Miniforge3-Linux-x86_64.sh"
+    "https://github.com/conda-forge/miniforge/releases/download/$MINIFORGE_VERSION/Miniforge3-$MINIFORGE_VERSION-Linux-x86_64.sh"
+  check_sha256 "$TOPH_HOME/miniforge.sh" "$MINIFORGE_SHA256"
   bash "$TOPH_HOME/miniforge.sh" -b -p "$MF"
   rm "$TOPH_HOME/miniforge.sh"
 fi
@@ -118,13 +139,11 @@ python -c "import torch; assert torch.cuda.is_available(), 'PyTorch cannot see t
 
 # ---------------------------------------------------------------- code
 REPO="$TOPH_HOME/toph"
-step "Getting the latest toph code"
-if [[ -d "$REPO/.git" ]]; then
-  git -C "$REPO" pull --ff-only
-  git -C "$REPO" submodule update --init --recursive
-else
-  git clone --recursive "$TOPH_REPO" "$REPO"
-fi
+step "Getting toph code ($TOPH_REF)"
+[[ -d "$REPO/.git" ]] || git clone "$TOPH_REPO" "$REPO"
+git -C "$REPO" fetch --tags --force origin
+git -C "$REPO" checkout --detach "$TOPH_REF"
+git -C "$REPO" submodule update --init --recursive
 PCDET="$REPO/third_party/OpenPCDet"
 
 if ! is_done build; then
@@ -144,6 +163,8 @@ if [[ ! -s "$CKPT" ]]; then
     false
   fi
 fi
+# Checked on every run: the checkpoint is a pickle, and loading a pickle can execute code.
+check_sha256 "$CKPT" "$CKPT_SHA256"
 
 # ---------------------------------------------------------------- data
 KITTI="$TOPH_HOME/kitti_tracking"

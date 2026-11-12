@@ -22,12 +22,28 @@ the project; it's a single command, and it cleans up after itself if you want.
 - A few hours where the PC can stay on. You can keep using it, but games or other GPU-heavy
   work will slow it down.
 
+### What this does to your PC
+Pasting a command from the internet means trusting whoever wrote it, so here's exactly what
+it does:
+- Installs **WSL + Ubuntu** (Microsoft's official Linux-inside-Windows). Everything else lives
+  inside it, in one folder (`~/toph-gpu`); nothing is installed into Windows itself.
+- Downloads a private Python, PyTorch, the OpenPCDet detector, a pretrained model and the KITTI
+  dataset. The installer and model are checked against fixed SHA-256 fingerprints, and it
+  stops if they don't match.
+- Runs only the code from a **fixed, frozen version** of this repo (tag `v0.1`), so later
+  changes to the repo can't change what runs on your machine. You can read it all at
+  [github.com/raul0084/toph/tree/v0.1](https://github.com/raul0084/toph/tree/v0.1).
+- Ubuntu is set up to log in as its admin user (root) with no password, to skip the setup
+  questions. That's fine on a personal PC, but remove it when you're done (see below).
+- The zip you send back contains only detected boxes (text files), timing info, your GPU model
+  and a log of the install. No personal files.
+
 ### Steps
 1. Open the **Start menu**, type **PowerShell**, and open it (no need for "Run as administrator").
 2. Paste this line and press **Enter**:
 
    ```powershell
-   irm https://raw.githubusercontent.com/raul0084/toph/main/scripts/gpu/windows.ps1 | iex
+   irm https://raw.githubusercontent.com/raul0084/toph/v0.1/scripts/gpu/windows.ps1 | iex
    ```
 
 3. **First time only:** it installs Ubuntu (a Linux environment that runs inside Windows, called
@@ -58,7 +74,7 @@ This deletes the Ubuntu install along with the dataset and all files it created.
 
 ### On Linux instead of Windows
 ```bash
-curl -fsSL https://raw.githubusercontent.com/raul0084/toph/main/scripts/gpu/setup.sh | bash
+curl -fsSL https://raw.githubusercontent.com/raul0084/toph/v0.1/scripts/gpu/setup.sh | bash
 ```
 The zip ends up in `~/toph-gpu/`; delete that folder to uninstall.
 

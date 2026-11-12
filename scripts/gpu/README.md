@@ -8,7 +8,7 @@ You need: an NVIDIA graphics card, ~90 GB free disk, and a few hours of leaving 
 2. Paste this line and press Enter:
 
    ```powershell
-   irm https://raw.githubusercontent.com/raul0084/toph/main/scripts/gpu/windows.ps1 | iex
+   irm https://raw.githubusercontent.com/raul0084/toph/v0.1/scripts/gpu/windows.ps1 | iex
    ```
 
 3. The first time, it installs Ubuntu (click **Yes** on the admin prompt) and asks you to **reboot**.
@@ -18,7 +18,7 @@ You need: an NVIDIA graphics card, ~90 GB free disk, and a few hours of leaving 
 ## Linux
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/raul0084/toph/main/scripts/gpu/setup.sh | bash
+curl -fsSL https://raw.githubusercontent.com/raul0084/toph/v0.1/scripts/gpu/setup.sh | bash
 ```
 
 The zip ends up in `~/toph-gpu/`.
