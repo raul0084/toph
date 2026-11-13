@@ -20,6 +20,7 @@ from scipy.optimize import linear_sum_assignment
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
+from src.data.boxes import DEFAULT_IMAGE_SHAPE  # noqa: E402
 from src.data.kitti import Calib, load_labels  # noqa: E402
 from src.data.paths import image_shape, kitti_dir  # noqa: E402
 from src.tracking.tracker import DEFAULT_CONFIGS, track_sequence  # noqa: E402
@@ -98,7 +99,7 @@ def main():
         gt = gt[gt["type"] != "DontCare"]
         n_frames = int(gt["frame"].max()) + 1
         dets = fake_detections(gt, n_frames, rng)
-        res = track_sequence(dets, calib, n_frames=n_frames, image_shape=image_shape(seq) or (375, 1242))
+        res = track_sequence(dets, calib, n_frames=n_frames, image_shape=image_shape(seq) or DEFAULT_IMAGE_SHAPE)
         stats = id_stats(gt, res)
         stats.update(seq=seq, frames=n_frames, fake_dets=len(dets))
         rows.append(stats)

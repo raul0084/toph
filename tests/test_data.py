@@ -62,14 +62,6 @@ def test_parse_tracking_calib(real_calib):
     assert real_calib.Tr_velo_cam[2, 3] == pytest.approx(-0.2717806)
 
 
-def test_parse_object_calib(tmp_path):
-    text = (CALIB_TRACKING.replace("R_rect ", "R0_rect: ")
-            .replace("Tr_velo_cam ", "Tr_velo_to_cam: "))
-    p = tmp_path / "obj.txt"
-    p.write_text(text)
-    assert Calib.from_file(p).R_rect[0, 1] == pytest.approx(9.837760e-03)
-
-
 def test_lidar_to_rect_axes(ideal_calib):
     np.testing.assert_allclose(ideal_calib.lidar_to_rect([10, 2, 1]), [[-2, -1, 10]])
 

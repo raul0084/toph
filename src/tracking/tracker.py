@@ -22,14 +22,11 @@ import numpy as np
 import pandas as pd
 
 from src.data.boxes import camera_boxes_to_2d, observation_angle, DEFAULT_IMAGE_SHAPE
-from src.data.kitti import Calib
+from src.data.kitti import LABEL_COLUMNS, Calib
 from src.tracking.association import associate, similarity
 from src.tracking.kalman import BoxKalmanFilter
 
-RESULT_COLUMNS = [
-    "frame", "track_id", "type", "truncated", "occluded", "alpha",
-    "x1", "y1", "x2", "y2", "h", "w", "l", "x", "y", "z", "ry", "score",
-]
+RESULT_COLUMNS = LABEL_COLUMNS + ["score"]
 
 
 @dataclass
@@ -53,10 +50,8 @@ class Track:
     id: int
     kf: BoxKalmanFilter
     score: float
-    hits: int = 1
     hit_streak: int = 1
     time_since_update: int = 0
-    age: int = 0
     confirmed: bool = False  # set once hit_streak reaches min_hits; never revoked
 
 
@@ -79,7 +74,6 @@ class ClassTracker:
 
         preds = np.array([t.kf.predict() for t in self.tracks]).reshape(-1, 7)
         for t in self.tracks:
-            t.age += 1
             t.time_since_update += 1
 
         matches, _, unmatched_d = associate(similarity(preds, boxes, cfg.metric), cfg.threshold)
@@ -88,7 +82,6 @@ class ClassTracker:
             t = self.tracks[ti]
             t.kf.update(boxes[di])
             t.score = scores[di]
-            t.hits += 1
             t.hit_streak = t.hit_streak + 1 if t.time_since_update == 1 else 1
             t.time_since_update = 0
             t.confirmed |= t.hit_streak >= cfg.min_hits
@@ -126,19 +119,15 @@ def track_sequence(dets: pd.DataFrame, calib: Calib, n_frames: int | None = None
     trackers = {c: ClassTracker(config=cfg, id_counter=ids) for c, cfg in configs.items()}
     if n_frames is None:
         n_frames = int(dets["frame"].max()) + 1 if len(dets) else 0
-    by_frame = {f: g for f, g in dets.groupby("frame")}
+    by_key = {k: g for k, g in dets.groupby(["frame", "type"])}
+    empty = dets.iloc[:0]
 
     rows = []
     for frame in range(n_frames):
-        g = by_frame.get(frame)
         for cls, trk in trackers.items():
-            d = g[g["type"] == cls] if g is not None else None
-            if d is None or d.empty:
-                boxes, scores = np.zeros((0, 7)), np.zeros(0)
-            else:
-                boxes = d[["x", "y", "z", "ry", "l", "w", "h"]].to_numpy()
-                scores = d["score"].to_numpy()
-            for tid, box, score in trk.step(boxes, scores):
+            d = by_key.get((frame, cls), empty)
+            boxes = d[["x", "y", "z", "ry", "l", "w", "h"]].to_numpy()
+            for tid, box, score in trk.step(boxes, d["score"].to_numpy()):
                 rows.append((frame, tid, cls, box, score))
 
     if not rows:

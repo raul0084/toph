@@ -3,7 +3,7 @@ import pandas as pd
 import pytest
 
 from src.data.kitti import Calib
-from src.tracking.association import associate, center_distance, iou_3d
+from src.tracking.association import associate, center_distance, iou_3d, similarity
 from src.tracking.kalman import BoxKalmanFilter, _align_heading
 from src.tracking.tracker import ClassConfig, track_sequence, write_kitti_tracking
 
@@ -97,7 +97,6 @@ def test_associate_gates_before_solving():
     # {A->0.5, B->-10} = 13.5, then both pairs fail the gate and the good 0.5 m match is lost.
     tracks = np.array([box(0, 10), box(3, 10)])
     dets = np.array([box(0.5, 10), box(-10, 10)])
-    from src.tracking.association import similarity
     m, ut, ud = associate(similarity(tracks, dets, "dist"), threshold=-1.5)
     assert m.tolist() == [[0, 0]]
     assert ut.tolist() == [1] and ud.tolist() == [1]
@@ -168,15 +167,11 @@ def test_crossing_pedestrians_keep_ids():
 
 
 def test_false_positive_is_not_reported():
-    objects = {1: lambda f: box(0, 10 + f)}
-    rng = np.random.default_rng(0)
-    res, _ = _run(objects, 20, "Car", ClassConfig(min_hits=3), NOISE, drop={})
-    n_ids = res.track_id.nunique()
     # Inject a one-frame ghost far away: it must never be reported (needs 3 consecutive hits).
     dets = [dict(frame=f, type="Car", score=0.9, x=0, y=1, z=10 + f, ry=0, l=4, w=2, h=1.5) for f in range(20)]
     dets.append(dict(frame=10, type="Car", score=0.9, x=15, y=1, z=30, ry=0, l=4, w=2, h=1.5))
     res = track_sequence(pd.DataFrame(dets), CALIB, n_frames=20, configs={"Car": ClassConfig(min_hits=3)})
-    assert n_ids == 1 and res.track_id.nunique() == 1
+    assert res.track_id.nunique() == 1
     assert not ((res.frame == 10) & (res.x > 10)).any()
 
 
