@@ -97,9 +97,9 @@ def in_camera_fov(boxes_cam: np.ndarray, calib: Calib,
 
 
 def detections_to_kitti(dets: pd.DataFrame, calib: Calib,
-                        image_shape: tuple[int, int] = DEFAULT_IMAGE_SHAPE,
-                        fov_only: bool = True) -> pd.DataFrame:
-    """Add KITTI camera-frame columns (x, y, z, h, w, l, ry, alpha, 2D bbox) to LiDAR detections.
+                        image_shape: tuple[int, int] = DEFAULT_IMAGE_SHAPE) -> pd.DataFrame:
+    """Add KITTI camera-frame columns (x, y, z, h, w, l, ry, alpha, 2D bbox) to LiDAR detections
+    and drop boxes outside the camera FOV.
 
     Input: DataFrame from kitti.load_detections. LiDAR columns are kept with a `lidar_` prefix.
     """
@@ -109,6 +109,4 @@ def detections_to_kitti(dets: pd.DataFrame, calib: Calib,
     out[["x", "y", "z", "h", "w", "l", "ry"]] = cam
     out["alpha"] = observation_angle(cam)
     out[["x1", "y1", "x2", "y2"]] = camera_boxes_to_2d(cam, calib, image_shape)
-    if fov_only:
-        out = out[in_camera_fov(cam, calib, image_shape)]
-    return out.reset_index(drop=True)
+    return out[in_camera_fov(cam, calib, image_shape)].reset_index(drop=True)

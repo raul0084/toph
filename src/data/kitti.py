@@ -27,35 +27,21 @@ class Calib:
 
     @classmethod
     def from_file(cls, path: str | Path) -> Calib:
-        """Parse a KITTI calib file. Handles both the tracking format ("R_rect", "Tr_velo_cam",
-        no colons) and the object format ("R0_rect:", "Tr_velo_to_cam:")."""
+        """Parse a KITTI Tracking calib file ("P2:", "R_rect", "Tr_velo_cam")."""
         raw = {}
         for line in Path(path).read_text().splitlines():
             parts = line.split()
-            if len(parts) < 2:
-                continue
-            raw[parts[0].rstrip(":")] = np.array(parts[1:], dtype=np.float64)
-
-        def get(*keys):
-            for k in keys:
-                if k in raw:
-                    return raw[k]
-            raise KeyError(f"{path}: none of {keys} found")
-
+            if len(parts) >= 2:
+                raw[parts[0].rstrip(":")] = np.array(parts[1:], dtype=np.float64)
         return cls(
-            P2=get("P2").reshape(3, 4),
-            R_rect=get("R_rect", "R0_rect").reshape(3, 3),
-            Tr_velo_cam=get("Tr_velo_cam", "Tr_velo_to_cam").reshape(3, 4),
+            P2=raw["P2"].reshape(3, 4),
+            R_rect=raw["R_rect"].reshape(3, 3),
+            Tr_velo_cam=raw["Tr_velo_cam"].reshape(3, 4),
         )
-
-    @property
-    def lidar_to_rect_matrix(self) -> np.ndarray:
-        """(3, 4) matrix mapping homogeneous LiDAR points to rectified camera points."""
-        return self.R_rect @ self.Tr_velo_cam
 
     def lidar_to_rect(self, pts: np.ndarray) -> np.ndarray:
         pts = np.asarray(pts, dtype=np.float64).reshape(-1, 3)
-        return _hom(pts) @ self.lidar_to_rect_matrix.T
+        return _hom(pts) @ (self.R_rect @ self.Tr_velo_cam).T
 
     def rect_to_img(self, pts: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
         """Project rectified camera points to pixels. Returns (uv (N, 2), depth (N,))."""
